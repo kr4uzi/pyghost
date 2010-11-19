@@ -1,0 +1,103 @@
+= Introduction =
+The basic way how the pyGHost++ python works is described [Handlers here]. This doc shows you how to create new Handlers (entry points for python in C++) and how to create you own low-level functions for python.
+
+= Adding new Handlers =
+If you want to add new handlers you can simply call the function `ExecuteHandler` everywhere (if you have included "python.h") you want. The prototype of the function:
+{{{
+void ExecuteHandler(string HandlerName, const char *Format, ...);
+}}}
+The string `HandlerName` will call all functions registered on this Handler.<br /><br />
+Example:<br />
+`ExecuteHandler("MyNewHandler", NULL);`<br />
+will call every function registered on `MyNewHandler` (with `host.registerHandler("MyNewHandler", myFunctionCreatedBefore)`) *without* any arguments.<br />
+To call functions with arguments, you have to use the `const char *Format` for the argument types, followed by the corresponding arguments themselves. A list of often used type chars:
+|| Format char || used for ||
+|| O || `PyObject * (CGHost, CBNET, CAdminGame, CGame, CMap -> Py_GetInstance()` ||
+|| s || `char[], char *, &char` ||
+|| i || `uint32_t, unsigned int` ||
+|| d || `double` ||
+|| b || `unsigned char` ||
+
+Example:<br />
+`ExecuteHandler("MyNewHandler", "isss", 123, "world", "from", "python");`<br />
+will then call every function with 4 arguments: The first is a integer, the 3 following ones are strings.<br />
+A fitting python function for this handler:
+{{{
+def exampleFunction(integer, string1, string2, string3):
+    if integer == 123:
+        print "hello", string1, string2, string3 + "!"
+}}}
+The output will be: `hello world from python!`
+
+= Adding new Methods =
+Adding new functions is bit more difficult. At first you need to create a new entry in python.h: Add a new `static PyObject *` method with two `PyObject` - pointers as arguments. The first argument is nearly never used but the python C-API needs it.<br />
+This method MUST be static. You will understand this in a few steps.
+Example:
+{{{
+static PyObject *myNew_Method(PyObject *, PyObject *);
+}}}
+
+This was the prototype, now you have to create the method-body (in python.cpp). In python every argument are stored in a single tuple (this is the second `PyObject *` argument of the prototype, the first one is the function itself, i think).<br />
+You have to parse the tuple before using its values.
+The python C-API provides a nice function for this:<br />
+`int PyArg_ParseTuple(PyObject *args, const char *format, ...);`<br />
+The first argument (args) should be the object where the arguments are saved (in a tuple) which is the second argument of the method. The table above (the one used for the Format char for `ExecuteHandler`) applies here too, but here you have to pass the POINTERS to the variables.<br /> 
+This can be compared with C's scanf- and printf-function.<br />
+Example:<br />
+{{{
+PyObject *CPyInterface::myNew_Method(PyObject *, PyObject *args) {
+    char *myString1, *myString2;
+    uint32_t myInteger;
+
+    if( !PyArg_ParseTuple(args, "iss", &myInteger, &myString1, &myString2) ) 
+        return NULL; 
+        /* return NULL indicates that an error which       *
+         * has been set through PyArg_ParseTuple occurred. *
+         * If you want to return nothing, use the          *
+         * macro Py_RETURN_NONE.                           */
+
+    if( myInteger == 123 ) {
+        cout << "[myNew_Method] says: myInteger is exactly 123." << endl;
+        cout << "The Strings are: \n"
+            << "[myString1] : " << myString1 << '\n'
+            << "[myString2] : " << myString2 << endl;
+    } else {
+        cout << "[myNew_Method] says: myInteger is *not* 123!" << endl;
+        cout << "returning false ..." << endl;
+        Py_RETURN_FALSE;
+    }
+
+    Py_RETURN_TRUE;
+}
+}}}
+
+Last step is now to add this function to the host module. All functions of the host module are saved in `static struct PyMethodDef host_methods`.<br />
+You mustn't delete the last element { NULL }!<br />
+The line you have to add now should look like this (simply add it before the last element( { NULL } ):
+{{{
+{ "myNew_Method", CPyInterface::myNew_Method, METH_VARARGS },
+/* function name in python, pointer to the method, multiple argument function */
+}}}
+
+You may now already have realized why the method you have just created must be static. The CPyInterface class is not a real class but it makes the code more clear. To access a method without having created a instance of it.<br />
+The new function will now be access-able with host.myNew_Method. Because of PyArg_ParseTuple which now will raise an exception (if you return NULL after the fail) if you do not call the function with a integer as first item and not with strings as second and third argument.<br />
+An example output:<br >
+{{{
+>>> x = host.myNew_Method(123, "hello", "world!")
+
+[myNew_Method] says: myInteger is exactly 123.
+The Strings are:
+[myString1] : hello
+[myString2] : world!
+>>> print x
+
+True
+>>> x = host.myNew_Method(456, "hallo", "world!")
+
+[myNew_Method] says: myInteger is *not* 123!
+returning false ...
+>>> print x
+
+False
+}}}
+The above output is NOT from the IDLE, i only wrote it that way because its more clear what is output and what is a function call.
