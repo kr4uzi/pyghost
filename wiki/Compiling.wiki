@@ -1,9 +1,10 @@
 == Windows ==
 === Preparations ===
-Download the latest Boost Libraries, Python v. 2.6.x and Microsoft Visual Studio 2008:
+== !! THIS WIKI HASN'T BEEN UPDATED FOR pyGHost++ v. 0.4 YET !! ==
+Download the latest Boost Libraries, Python (> v.2.3) and Microsoft Visual Studio 2008:
 <br />
  * [http://www.boost.org/users/download/ Boost Libraries]
- * [http://www.python.org/download/ Python 2.6.x]
+ * [http://www.python.org/download/ Python 2.x.x]
  * [http://www.microsoft.com/express/Downloads/ Microsoft Visual C++ 2008 Express Edition]
 
 === Compiling the base packages ===
@@ -14,7 +15,9 @@ Download the latest Boost Libraries, Python v. 2.6.x and Microsoft Visual Studio
  * Start->Run->cmd.exe (or *Windows Key*+*R*->cmd.exe)
  * PUSHD "path\to\Boost\"
  * bootstrap [http://img97.imageshack.us/img97/270/compilingwindows1.jpg [screenshot]]
- * bjam --with-filesystem --with-thread --with-date_time [http://img528.imageshack.us/img528/1631/800pxcompilingwindows2.jpg [screenshot start]] | [http://img693.imageshack.us/img693/5682/800pxcompilingwindows3.jpg [screenshot end]]
+ * bjam --with-filesystem --with-thread --with-date_time 
+ * bjam --with-python link=shared
+[http://img528.imageshack.us/img528/1631/800pxcompilingwindows2.jpg [screenshot start]] | [http://img693.imageshack.us/img693/5682/800pxcompilingwindows3.jpg [screenshot end]]
 === Configuring Visual Studio ===
  # Open ghost.sln in .\pyGHost++\
  # Tools -> Options -> Projects and Solutions -> VC++ Directories
