@@ -290,6 +290,7 @@ BOOST_PYTHON_MODULE(host)
 	def( "registerHandler", RegisterHandler, RegisterHandler_Overloads() );
 	def( "unregisterHandler", UnregisterHandler, UnregisterHandler_Overloads() );
 	def( "log", CONSOLE_Print );
+	def( "getTime", GetTime );
 }
 
 BOOST_PYTHON_MODULE(replay)
@@ -569,6 +570,58 @@ BOOST_PYTHON_MODULE(incomingChatPlayer)
 	;
 }
 
+struct BYTEARRAY_to_list
+{
+	static PyObject* convert( vector<unsigned char> const& vec)
+	{
+		boost::python::list result;
+
+		for( vector<unsigned char>::const_iterator i = vec.begin(); i != vec.end() ; i++ ) 
+		{
+			result.append( boost::python::object(*i) );
+		}
+
+		return boost::python::incref( result.ptr() );
+	}
+};
+
+struct BYTEARRAY_from_list
+{
+	static void* convertible( PyObject* py_object )
+	{
+		if( !PyList_Check( py_object ) )
+			return NULL;
+
+		return py_object;
+	}
+
+	static void construct( PyObject* obj_ptr, boost::python::converter::rvalue_from_python_stage1_data* data)
+    {
+		vector<unsigned char> vec;
+
+		for( Py_ssize_t i = 0; i < PyList_Size(obj_ptr); i++ )
+		{
+			PyObject* obj = PyList_GetItem(obj_ptr, i);
+
+			if( !PyInt_Check(obj) )
+			{
+				string Error = "object must be int, not ";
+				Error += obj->ob_type->tp_name;
+				PyErr_SetString( PyExc_TypeError, Error.c_str() );
+
+				boost::python::throw_error_already_set();
+			}
+
+			vec.push_back( (unsigned char)PyInt_AsLong(obj) );
+		}
+		
+		void* storage = ((boost::python::converter::rvalue_from_python_storage< vector<unsigned char> >*)data)->storage.bytes;
+		
+		new(storage) vector<unsigned char>(vec);
+		data->convertible = storage;
+    }
+ };
+
 //
 // main
 //
@@ -716,6 +769,8 @@ int main( int argc, char **argv )
 #endif
 
 	Py_Initialize( );
+	PyEval_InitThreads();
+	PyThreadState* MainThreadState;
 
 	boost::python::object global( boost::python::import("__main__").attr("__dict__") );
 	boost::python::exec("import sys, host												\n"
@@ -776,13 +831,23 @@ int main( int argc, char **argv )
 	CBNCSUtilInterface::RegisterPythonClass( );
 	CConfig::RegisterPythonClass( );
 
+	boost::python::to_python_converter< BYTEARRAY, BYTEARRAY_to_list>();
+	boost::python::converter::registry::push_back( &BYTEARRAY_from_list::convertible, &BYTEARRAY_from_list::construct, boost::python::type_id< BYTEARRAY >() );
+
+	MainThreadState = PyGILState_GetThisThreadState( );
+	PyEval_ReleaseThread( MainThreadState );
+
 	try
 	{
+		PyGILState_STATE gstate = PyGILState_Ensure( );
 		boost::python::object module = boost::python::import("plugins.python");
+		PyGILState_Release( gstate );
 	}
 	catch(...)
 	{
+		PyGILState_STATE gstate = PyGILState_Ensure( );
 		PyErr_Print( );
+		PyGILState_Release( gstate );
 		throw;
 	}
 
@@ -827,6 +892,9 @@ int main( int argc, char **argv )
 	{ 
 
 	}
+
+	PyEval_AcquireThread( MainThreadState );
+	Py_Finalize( );
 
 #ifdef WIN32
 	// shutdown winsock
@@ -1139,6 +1207,8 @@ CGHost :: CGHost( CConfig *CFG )
 
 		if( m_AdminGamePort == m_HostPort )
 			CONSOLE_Print( "[GHOST] warning - admingame_port and bot_hostport are set to the same value, you won't be able to host any games" );
+
+		EventGameCreated( m_AdminGame );
 	}
 	else
 		m_AdminGame = NULL;
@@ -1895,6 +1965,19 @@ void CGHost :: EventGameDeleted( CBaseGame *game )
 	EXECUTE_HANDLER("GameDeleted", false, boost::ref(this), boost::ref(game))
 }
 
+void CGHost :: EventGameCreated( CBaseGame* game )
+{
+	try
+	{
+		EXECUTE_HANDLER("GameCreated", true, boost::ref(this), boost::ref(game))
+	}
+	catch(...)
+	{
+	}
+
+	EXECUTE_HANDLER("GameCreated", false, boost::ref(this), boost::ref(this))
+}
+
 void CGHost :: ReloadConfigs( )
 {
 	CConfig CFG;
@@ -2238,6 +2321,8 @@ void CGHost :: CreateGame( CMap *map, unsigned char gameState, bool saveGame, st
 	else
 		m_CurrentGame = new CGame( this, map, NULL, m_HostPort, gameState, gameName, ownerName, creatorName, creatorServer );
 
+	EventGameCreated( m_CurrentGame );
+
 	// todotodo: check if listening failed and report the error to the user
 
 	if( m_SaveGame )
@@ -2311,92 +2396,92 @@ void CGHost :: RegisterPythonClass( )
 	using namespace boost::python;
 
 	class_<CGHost>("GHost", no_init)
-		.def_readwrite("UDPSocket", &CGHost::m_UDPSocket)
-		.def_readwrite("reconnectSocket", &CGHost::m_ReconnectSocket)
-		.def_readwrite("reconnectSockets", &CGHost::m_ReconnectSockets)
-		.def_readwrite("GPSProtocol", &CGHost::m_GPSProtocol)
-		.def_readwrite("CRC", &CGHost::m_CRC)
-		.def_readwrite("SHA", &CGHost::m_SHA)
-		.def_readwrite("BNETs", &CGHost::m_BNETs)
-		.def_readwrite("currentGame", &CGHost::m_CurrentGame)
-		.def_readwrite("adminGame", &CGHost::m_AdminGame)
-		.def_readwrite("games", &CGHost::m_Games)
-		.def_readwrite("DB", &CGHost::m_DB)
-		.def_readwrite("DBLocal", &CGHost::m_DBLocal)
-		.def_readwrite("callables", &CGHost::m_Callables)
-		.def_readwrite("localAddresses", &CGHost::m_LocalAddresses)
-		.def_readwrite("language", &CGHost::m_Language)
-		.def_readwrite("Map", &CGHost::m_Map)
-		.def_readwrite("adminMap", &CGHost::m_AdminMap)
-		.def_readwrite("autoHostMap", &CGHost::m_AutoHostMap)
-		.def_readwrite("saveGame", &CGHost::m_SaveGame)
-		.def_readwrite("enforcePlayers", &CGHost::m_EnforcePlayers)
-		.def_readwrite("exiting", &CGHost::m_Exiting)
-		.def_readwrite("exitingNice", &CGHost::m_ExitingNice)
-		.def_readwrite("enabled", &CGHost::m_Enabled)
-		.def_readwrite("version", &CGHost::m_Version)
-		.def_readwrite("hostCounter", &CGHost::m_HostCounter)
-		.def_readwrite("autoHostGameName", &CGHost::m_AutoHostGameName)
-		.def_readwrite("autoHostOwner", &CGHost::m_AutoHostOwner)
-		.def_readwrite("autoHostServer", &CGHost::m_AutoHostServer)
-		.def_readwrite("autoHostMaximumGames", &CGHost::m_AutoHostMaximumGames)
-		.def_readwrite("autoHostAutoStartPlayers", &CGHost::m_AutoHostAutoStartPlayers)
-		.def_readwrite("lastAutoHostTime", &CGHost::m_LastAutoHostTime)
-		.def_readwrite("autoHostMatchMaking", &CGHost::m_AutoHostMatchMaking)
-		.def_readwrite("autoHostMinimumScore", &CGHost::m_AutoHostMinimumScore)
-		.def_readwrite("autoHostMaximumScore", &CGHost::m_AutoHostMaximumScore)
-		.def_readwrite("allGamesFinished", &CGHost::m_AllGamesFinished)
-		.def_readwrite("allGamesFinishedTime", &CGHost::m_AllGamesFinishedTime)
-		.def_readwrite("languageFile", &CGHost::m_LanguageFile)
-		.def_readwrite("warcraft3Path", &CGHost::m_Warcraft3Path)
-		.def_readwrite("TFT", &CGHost::m_TFT)
-		.def_readwrite("bindAddress", &CGHost::m_BindAddress)
-		.def_readwrite("hostPort", &CGHost::m_HostPort)
-		.def_readwrite("reconnect", &CGHost::m_Reconnect)
-		.def_readwrite("reconnectPort", &CGHost::m_ReconnectPort)
-		.def_readwrite("reconnectWaitTime", &CGHost::m_ReconnectWaitTime)
-		.def_readwrite("maxGames", &CGHost::m_MaxGames)
-		.def_readwrite("commandTrigger", &CGHost::m_CommandTrigger)
-		.def_readwrite("mapCFGPath", &CGHost::m_MapCFGPath)
-		.def_readwrite("saveGamePath", &CGHost::m_SaveGamePath)
-		.def_readwrite("mapPath", &CGHost::m_MapPath)
-		.def_readwrite("saveReplays", &CGHost::m_SaveReplays)
-		.def_readwrite("replayPath", &CGHost::m_ReplayPath)
-		.def_readwrite("virtualHostName", &CGHost::m_VirtualHostName)
-		.def_readwrite("hideIPAddresses", &CGHost::m_HideIPAddresses)
-		.def_readwrite("checkMultipleIPUsage", &CGHost::m_CheckMultipleIPUsage)
-		.def_readwrite("spoofChecks", &CGHost::m_SpoofChecks)
-		.def_readwrite("requireSpoofChecks", &CGHost::m_RequireSpoofChecks)
-		.def_readwrite("reserveAdmins", &CGHost::m_ReserveAdmins)
-		.def_readwrite("refreshMessages", &CGHost::m_RefreshMessages)
-		.def_readwrite("autoLock", &CGHost::m_AutoLock)
-		.def_readwrite("autoSave", &CGHost::m_AutoSave)
-		.def_readwrite("allowDownloads", &CGHost::m_AllowDownloads)
-		.def_readwrite("pingDuringDownloads", &CGHost::m_PingDuringDownloads)
-		.def_readwrite("maxDownloaders", &CGHost::m_MaxDownloaders)
-		.def_readwrite("maxDownloadSpeed", &CGHost::m_MaxDownloadSpeed)
-		.def_readwrite("LCPings", &CGHost::m_LCPings)
-		.def_readwrite("autoKickPing", &CGHost::m_AutoKickPing)
-		.def_readwrite("banMethod", &CGHost::m_BanMethod)
-		.def_readwrite("IPBlackListFile", &CGHost::m_IPBlackListFile)
-		.def_readwrite("lobbyTimeLimit", &CGHost::m_LobbyTimeLimit)
-		.def_readwrite("latency", &CGHost::m_Latency)
-		.def_readwrite("syncLimit", &CGHost::m_SyncLimit)
-		.def_readwrite("voteKickAllowed", &CGHost::m_VoteKickAllowed)
-		.def_readwrite("voteKickPercentage", &CGHost::m_VoteKickPercentage)
-		.def_readwrite("defaultMap", &CGHost::m_DefaultMap)
-		.def_readwrite("MOTDFile", &CGHost::m_MOTDFile)
-		.def_readwrite("gameLoadedFile", &CGHost::m_GameLoadedFile)
-		.def_readwrite("gameOverFile", &CGHost::m_GameOverFile)
-		.def_readwrite("localAdminMessages", &CGHost::m_LocalAdminMessages)
-		.def_readwrite("adminGameCreate", &CGHost::m_AdminGameCreate)
-		.def_readwrite("adminGamePort", &CGHost::m_AdminGamePort)
-		.def_readwrite("adminGamePassword", &CGHost::m_AdminGamePassword)
-		.def_readwrite("adminGameMap", &CGHost::m_AdminGameMap)
-		.def_readwrite("m_ReplayWar3Version", &CGHost::m_ReplayWar3Version)
-		.def_readwrite("m_ReplayBuildNumber", &CGHost::m_ReplayBuildNumber)
-		.def_readwrite("TCPNoDelay", &CGHost::m_TCPNoDelay)
-		.def_readwrite("matchMakingMethod", &CGHost::m_MatchMakingMethod)
+		.add_property("UDPSocket", make_getter(&CGHost::m_UDPSocket, return_value_policy<reference_existing_object>()))
+		.add_property("reconnectSocket", make_getter(&CGHost::m_ReconnectSocket, return_value_policy<reference_existing_object>()))
+		.def_readonly("reconnectSockets", &CGHost::m_ReconnectSockets)
+		.add_property("GPSProtocol", make_getter(&CGHost::m_GPSProtocol, return_value_policy<reference_existing_object>()))
+		.add_property("CRC", make_getter(&CGHost::m_CRC, return_value_policy<reference_existing_object>()))
+		.add_property("SHA", make_getter(&CGHost::m_SHA, return_value_policy<reference_existing_object>()))
+		.def_readonly("BNETs", &CGHost::m_BNETs)
+		.add_property("currentGame", make_getter(&CGHost::m_CurrentGame, return_value_policy<reference_existing_object>()))
+		.add_property("adminGame", make_getter(&CGHost::m_AdminGame	, return_value_policy<reference_existing_object>()))
+		.def_readonly("games", &CGHost::m_Games)
+		.add_property("DB", make_getter(&CGHost::m_DB, return_value_policy<reference_existing_object>()))
+		.add_property("DBLocal", make_getter(&CGHost::m_DBLocal, return_value_policy<reference_existing_object>()))
+		.def_readonly("callables", &CGHost::m_Callables)
+		.def_readonly("localAddresses", &CGHost::m_LocalAddresses)
+		.add_property("language", make_getter(&CGHost::m_Language, return_value_policy<reference_existing_object>()))
+		.add_property("map", make_getter(&CGHost::m_Map, return_value_policy<reference_existing_object>()))
+		.add_property("adminMap", make_getter(&CGHost::m_AdminMap, return_value_policy<reference_existing_object>()))
+		.add_property("autoHostMap", make_getter(&CGHost::m_AutoHostMap, return_value_policy<reference_existing_object>()))
+		.add_property("saveGame", make_getter(&CGHost::m_SaveGame, return_value_policy<reference_existing_object>()))
+		.def_readonly("enforcePlayers", &CGHost::m_EnforcePlayers)
+		.def_readonly("exiting", &CGHost::m_Exiting)
+		.def_readonly("exitingNice", &CGHost::m_ExitingNice)
+		.def_readonly("enabled", &CGHost::m_Enabled)
+		.def_readonly("version", &CGHost::m_Version)
+		.def_readonly("hostCounter", &CGHost::m_HostCounter)
+		.def_readonly("autoHostGameName", &CGHost::m_AutoHostGameName)
+		.def_readonly("autoHostOwner", &CGHost::m_AutoHostOwner)
+		.def_readonly("autoHostServer", &CGHost::m_AutoHostServer)
+		.def_readonly("autoHostMaximumGames", &CGHost::m_AutoHostMaximumGames)
+		.def_readonly("autoHostAutoStartPlayers", &CGHost::m_AutoHostAutoStartPlayers)
+		.def_readonly("lastAutoHostTime", &CGHost::m_LastAutoHostTime)
+		.def_readonly("autoHostMatchMaking", &CGHost::m_AutoHostMatchMaking)
+		.def_readonly("autoHostMinimumScore", &CGHost::m_AutoHostMinimumScore)
+		.def_readonly("autoHostMaximumScore", &CGHost::m_AutoHostMaximumScore)
+		.def_readonly("allGamesFinished", &CGHost::m_AllGamesFinished)
+		.def_readonly("allGamesFinishedTime", &CGHost::m_AllGamesFinishedTime)
+		.def_readonly("languageFile", &CGHost::m_LanguageFile)
+		.def_readonly("warcraft3Path", &CGHost::m_Warcraft3Path)
+		.def_readonly("TFT", &CGHost::m_TFT)
+		.def_readonly("bindAddress", &CGHost::m_BindAddress)
+		.def_readonly("hostPort", &CGHost::m_HostPort)
+		.def_readonly("reconnect", &CGHost::m_Reconnect)
+		.def_readonly("reconnectPort", &CGHost::m_ReconnectPort)
+		.def_readonly("reconnectWaitTime", &CGHost::m_ReconnectWaitTime)
+		.def_readonly("maxGames", &CGHost::m_MaxGames)
+		.def_readonly("commandTrigger", &CGHost::m_CommandTrigger)
+		.def_readonly("mapCFGPath", &CGHost::m_MapCFGPath)
+		.def_readonly("saveGamePath", &CGHost::m_SaveGamePath)
+		.def_readonly("mapPath", &CGHost::m_MapPath)
+		.def_readonly("saveReplays", &CGHost::m_SaveReplays)
+		.def_readonly("replayPath", &CGHost::m_ReplayPath)
+		.def_readonly("virtualHostName", &CGHost::m_VirtualHostName)
+		.def_readonly("hideIPAddresses", &CGHost::m_HideIPAddresses)
+		.def_readonly("checkMultipleIPUsage", &CGHost::m_CheckMultipleIPUsage)
+		.def_readonly("spoofChecks", &CGHost::m_SpoofChecks)
+		.def_readonly("requireSpoofChecks", &CGHost::m_RequireSpoofChecks)
+		.def_readonly("reserveAdmins", &CGHost::m_ReserveAdmins)
+		.def_readonly("refreshMessages", &CGHost::m_RefreshMessages)
+		.def_readonly("autoLock", &CGHost::m_AutoLock)
+		.def_readonly("autoSave", &CGHost::m_AutoSave)
+		.def_readonly("allowDownloads", &CGHost::m_AllowDownloads)
+		.def_readonly("pingDuringDownloads", &CGHost::m_PingDuringDownloads)
+		.def_readonly("maxDownloaders", &CGHost::m_MaxDownloaders)
+		.def_readonly("maxDownloadSpeed", &CGHost::m_MaxDownloadSpeed)
+		.def_readonly("LCPings", &CGHost::m_LCPings)
+		.def_readonly("autoKickPing", &CGHost::m_AutoKickPing)
+		.def_readonly("banMethod", &CGHost::m_BanMethod)
+		.def_readonly("IPBlackListFile", &CGHost::m_IPBlackListFile)
+		.def_readonly("lobbyTimeLimit", &CGHost::m_LobbyTimeLimit)
+		.def_readonly("latency", &CGHost::m_Latency)
+		.def_readonly("syncLimit", &CGHost::m_SyncLimit)
+		.def_readonly("voteKickAllowed", &CGHost::m_VoteKickAllowed)
+		.def_readonly("voteKickPercentage", &CGHost::m_VoteKickPercentage)
+		.def_readonly("defaultMap", &CGHost::m_DefaultMap)
+		.def_readonly("MOTDFile", &CGHost::m_MOTDFile)
+		.def_readonly("gameLoadedFile", &CGHost::m_GameLoadedFile)
+		.def_readonly("gameOverFile", &CGHost::m_GameOverFile)
+		.def_readonly("localAdminMessages", &CGHost::m_LocalAdminMessages)
+		.def_readonly("adminGameCreate", &CGHost::m_AdminGameCreate)
+		.def_readonly("adminGamePort", &CGHost::m_AdminGamePort)
+		.def_readonly("adminGamePassword", &CGHost::m_AdminGamePassword)
+		.def_readonly("adminGameMap", &CGHost::m_AdminGameMap)
+		.def_readonly("m_ReplayWar3Version", &CGHost::m_ReplayWar3Version)
+		.def_readonly("m_ReplayBuildNumber", &CGHost::m_ReplayBuildNumber)
+		.def_readonly("TCPNoDelay", &CGHost::m_TCPNoDelay)
+		.def_readonly("matchMakingMethod", &CGHost::m_MatchMakingMethod)
 
 		.def("reloadConfigs", &CGHost::ReloadConfigs)
 		.def("setConfigs", &CGHost::SetConfigs)

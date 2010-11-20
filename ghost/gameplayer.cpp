@@ -187,15 +187,15 @@ void CPotentialPlayer :: RegisterPythonClass( )
 	using namespace boost::python;
 
 	class_<CPotentialPlayer>("potentialPlayer", no_init)
-		.def_readonly("protocol", &CPotentialPlayer::m_Protocol)
-		.def_readonly("game", &CPotentialPlayer::m_Game)
+		.add_property("protocol", make_getter(&CPotentialPlayer::m_Protocol, return_value_policy<reference_existing_object>()))
+		.add_property("game", make_getter(&CPotentialPlayer::m_Game, return_value_policy<reference_existing_object>()))
 
-		.def_readonly("socket", &CPotentialPlayer::m_Socket)
+		.add_property("game", make_getter(&CPotentialPlayer::m_Game, return_value_policy<reference_existing_object>()))
 		.def_readonly("packets", &CPotentialPlayer::m_Packets)
 		.def_readonly("deleteMe", &CPotentialPlayer::m_DeleteMe)
 		.def_readonly("error", &CPotentialPlayer::m_Error)
 		.def_readonly("errorString", &CPotentialPlayer::m_ErrorString)
-		.def_readonly("incomingJoinPlayer", &CPotentialPlayer::m_IncomingJoinPlayer)
+		.add_property("incomingJoinPlayer", make_getter(&CPotentialPlayer::m_IncomingJoinPlayer, return_value_policy<reference_existing_object>()))
 
 		.def("getSocket", &CPotentialPlayer::GetSocket, return_internal_reference<>())
 		.def("getExternalIP", &CPotentialPlayer::GetExternalIP)
