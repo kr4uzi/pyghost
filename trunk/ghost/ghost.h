@@ -153,6 +153,7 @@ public:
 	void EventBNETWhisper( CBNET *bnet, string user, string message );
 	void EventBNETChat( CBNET *bnet, string user, string message );
 	void EventBNETEmote( CBNET *bnet, string user, string message );
+	void EventGameCreated( CBaseGame *game );
 	void EventGameDeleted( CBaseGame *game );
 
 	// other functions

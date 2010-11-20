@@ -85,7 +85,9 @@ extern map< string, vector<boost::python::object> > gHandlersSecond;
 			{																									\
 				try																								\
 				{																								\
+					PyGILState_STATE gstate = PyGILState_Ensure( );												\
 					bool Val = boost::python::extract<bool>( (*i)( __VA_ARGS__ ) );								\
+					PyGILState_Release( gstate );																\
 																												\
 					if( Val = false )																			\
 						AllSucceeded = false;																	\
@@ -93,7 +95,9 @@ extern map< string, vector<boost::python::object> > gHandlersSecond;
 				catch(...)																						\
 				{																								\
 					AllSucceeded = false;																		\
+					PyGILState_STATE gstate = PyGILState_Ensure( );												\
 					PyErr_Print( );																				\
+					PyGILState_Release( gstate );																\
 				}																								\
 			}																									\
 																												\
