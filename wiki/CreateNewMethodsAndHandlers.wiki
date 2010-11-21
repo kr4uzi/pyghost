@@ -31,14 +31,14 @@ The sense if the third argument is to be able to abort this execution. This can 
 = Adding new Methods =
 Adding new functions became very easy with the API using boost::python. 
 At first you have do decide weather you want to create a new module or to extend a existing module (e.g. the host module). <br />
-If you want to extend a module you can just search for `BOOST_PYTHON_MODULE(<modulename>)` and just add a def(<method_name_in_python>, <pointer_to_method>). The existing defs should last.<br />
+If you want to extend a module you can just search for `BOOST_PYTHON_MODULE(<modulename>)` and just add a `def(<method_name_in_python>, <pointer_to_method>)`. The existing defs should last.<br />
 Creating a new module is as easy as adding functions but require a few more lines of code:
 {{{
 BOOST_PYTHON_MODULE(<module_name>)
 {
 boost::python::def(...);
 }}}
-Be careful: <module_name> is NOT a string because this macro defines a init function which you will have to add near `Py_Initialize`. You will have to call this function before Py_Initialize:
+Be careful: `<module_name>` is NOT a string because this macro defines a init function which you will have to add near `Py_Initialize`. You will have to call this function before Py_Initialize:
 {{{
 PyImport_AppendInittab(<module_name_this_time_as_string>, init<module_name>)
 }}}
