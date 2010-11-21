@@ -363,6 +363,20 @@ BOOST_PYTHON_MODULE(map)
 	scope().attr("MAPGAMETYPE_OBSFULL") = MAPGAMETYPE_OBSFULL;
 	scope().attr("MAPGAMETYPE_OBSONDEATH") = MAPGAMETYPE_OBSONDEATH;
 	scope().attr("MAPGAMETYPE_OBSNONE") = MAPGAMETYPE_OBSNONE;
+
+	scope().attr("MAPGAMETYPE_UNKNOWN0") = MAPGAMETYPE_UNKNOWN0;
+    scope().attr("MAPGAMETYPE_SAVEDGAME") =	MAPGAMETYPE_SAVEDGAME;
+    scope().attr("MAPGAMETYPE_PRIVATEGAME") = MAPGAMETYPE_PRIVATEGAME;
+    scope().attr("MAPGAMETYPE_MAKERUSER") = MAPGAMETYPE_MAKERUSER;
+    scope().attr("MAPGAMETYPE_MAKERBLIZZARD") = MAPGAMETYPE_MAKERBLIZZARD;
+    scope().attr("MAPGAMETYPE_TYPEMELEE") = MAPGAMETYPE_TYPEMELEE;
+    scope().attr("MAPGAMETYPE_TYPESCENARIO") = MAPGAMETYPE_TYPESCENARIO;
+    scope().attr("MAPGAMETYPE_SIZESMALL") = MAPGAMETYPE_SIZESMALL;
+    scope().attr("MAPGAMETYPE_SIZEMEDIUM") = MAPGAMETYPE_SIZEMEDIUM;
+    scope().attr("MAPGAMETYPE_SIZELARGE") = MAPGAMETYPE_SIZELARGE;
+    scope().attr("MAPGAMETYPE_OBSFULL") = MAPGAMETYPE_OBSFULL;
+    scope().attr("MAPGAMETYPE_OBSONDEATH") = MAPGAMETYPE_OBSONDEATH;
+    scope().attr("MAPGAMETYPE_OBSNONE") = MAPGAMETYPE_OBSNONE;
 }
 
 BOOST_PYTHON_MODULE(GPSProtocol)
@@ -1975,7 +1989,7 @@ void CGHost :: EventGameCreated( CBaseGame* game )
 	{
 	}
 
-	EXECUTE_HANDLER("GameCreated", false, boost::ref(this), boost::ref(this))
+	EXECUTE_HANDLER("GameCreated", false, boost::ref(this), boost::ref(game))
 }
 
 void CGHost :: ReloadConfigs( )
@@ -2478,8 +2492,9 @@ void CGHost :: RegisterPythonClass( )
 		.def_readonly("adminGamePort", &CGHost::m_AdminGamePort)
 		.def_readonly("adminGamePassword", &CGHost::m_AdminGamePassword)
 		.def_readonly("adminGameMap", &CGHost::m_AdminGameMap)
-		.def_readonly("m_ReplayWar3Version", &CGHost::m_ReplayWar3Version)
-		.def_readonly("m_ReplayBuildNumber", &CGHost::m_ReplayBuildNumber)
+		.def_readonly("LANWar3Version", &CGHost::m_LANWar3Version)
+		.def_readonly("replayWar3Version", &CGHost::m_ReplayWar3Version)
+		.def_readonly("replayBuildNumber", &CGHost::m_ReplayBuildNumber)
 		.def_readonly("TCPNoDelay", &CGHost::m_TCPNoDelay)
 		.def_readonly("matchMakingMethod", &CGHost::m_MatchMakingMethod)
 
