@@ -25,7 +25,7 @@ host.registerHandler("MyNewHandler", exampleFunction, True)
 }}}
 
 The explanation about the boolean optinal argument for host.registerHandler (False by default):<br />
-You have 2 options on how to register a python function. The simplest method is just to call host.registerHandler without the optinal third argument. All the default handlers like `PlayerJoined` etc will call your python function *AFTER* the c++ function itself has been executed.<br />
+You have 2 options on how to register a python function. The simplest method is just to call host.registerHandler without the optinal third argument. All the default handlers like `PlayerJoined` etc will then call your python function *AFTER* the c++ function itself has been executed.<br />
 The sense if the third argument is to be able to abort this execution. This can be e.g. useful if you want to completely replace the original c++ function. Or if you just want your python function to be executed before the c++ stuff (but then make sure you dont return True or raise an error because this will also raise/throw an error in the c++ funciton and thus abort it; returning Nothing (= return None = if you dont even use `return` in your function) or False will not result in a throwing c++ function)
 
 = Adding new Methods =
